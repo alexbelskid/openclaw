@@ -108,7 +108,6 @@ export function parseGraph(rawFiles: MemoryFile[]): { nodes: GraphNode[]; edges:
 export async function loadGraphData(
   state: GraphState,
   apiBase: string,
-  token: string,
 ): Promise<void> {
   if (state.graphLoading) return;
 
@@ -116,9 +115,7 @@ export async function loadGraphData(
   state.graphError = null;
 
   try {
-    const res = await fetch(`${apiBase}/api/memory/files`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const res = await fetch(`${apiBase}/api/memory/files`);
 
     if (!res.ok) {
       throw new Error(`Memory API returned ${res.status}`);
@@ -140,14 +137,11 @@ export async function loadNodeContent(
   state: GraphState,
   nodeId: string,
   apiBase: string,
-  token: string,
 ): Promise<void> {
   // Content is already in the initial fetch, find it from cache
   // If we need fresh content, fetch individual file
   try {
-    const res = await fetch(`${apiBase}/api/memory/files`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const res = await fetch(`${apiBase}/api/memory/files`);
     if (!res.ok) throw new Error(`${res.status}`);
     const data: { files: MemoryFile[] } = await res.json();
     const file = data.files.find((f) => f.path === nodeId);

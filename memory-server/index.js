@@ -6,21 +6,19 @@ const PORT = parseInt(process.env.PORT || "3001", 10);
 const TOKEN = process.env.MEMORY_API_TOKEN || "";
 const WORKSPACE = process.env.WORKSPACE_DIR || "/root/.openclaw/workspace";
 
-if (!TOKEN) {
-  console.error("MEMORY_API_TOKEN is required");
-  process.exit(1);
-}
-
 const app = express();
 
-// Auth middleware
-app.use("/api/memory", (req, res, next) => {
-  const auth = req.headers.authorization;
-  if (!auth || auth !== `Bearer ${TOKEN}`) {
+// Auth middleware — optional, only enforced if TOKEN is set.
+// When behind nginx on localhost, token can be omitted.
+if (TOKEN) {
+  app.use("/api/memory", (req, res, next) => {
+    const auth = req.headers.authorization;
+    if (auth && auth === `Bearer ${TOKEN}`) return next();
+    // Allow requests without auth when no token is configured
+    if (!TOKEN) return next();
     return res.status(401).json({ error: "unauthorized" });
-  }
-  next();
-});
+  });
+}
 
 /**
  * GET /api/memory/files

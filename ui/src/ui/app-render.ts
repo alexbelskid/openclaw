@@ -818,7 +818,6 @@ export function renderApp(state: AppViewState) {
           state.tab === "graph"
             ? lazyRender(lazyGraph, (m) => {
                 const apiBase = typeof window !== "undefined" ? window.location.origin : "";
-                const token = (state as Record<string, unknown>).graphApiToken as string ?? "";
                 return m.renderGraph({
                   loading: state.graphLoading ?? false,
                   error: state.graphError ?? null,
@@ -828,7 +827,7 @@ export function renderApp(state: AppViewState) {
                   selectedContent: state.graphSelectedContent ?? null,
                   showConfigFiles: state.graphShowConfigFiles ?? false,
                   onSelectNode: (id: string) => {
-                    loadNodeContent(state, id, apiBase, token).then(() => requestHostUpdate?.());
+                    loadNodeContent(state, id, apiBase).then(() => requestHostUpdate?.());
                   },
                   onClosePreview: () => {
                     state.graphSelectedNode = null;
@@ -836,7 +835,7 @@ export function renderApp(state: AppViewState) {
                     requestHostUpdate?.();
                   },
                   onRefresh: () => {
-                    loadGraphData(state, apiBase, token).then(() => requestHostUpdate?.());
+                    loadGraphData(state, apiBase).then(() => requestHostUpdate?.());
                   },
                   onToggleConfigFiles: () => {
                     state.graphShowConfigFiles = !(state.graphShowConfigFiles ?? false);

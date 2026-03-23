@@ -284,8 +284,7 @@ export async function refreshActiveTab(host: SettingsHost) {
   }
   if (host.tab === "graph") {
     const apiBase = typeof window !== "undefined" ? window.location.origin : "";
-    const token = (host as Record<string, unknown>).graphApiToken as string ?? "";
-    await loadGraphData(host as unknown as OpenClawApp, apiBase, token);
+    await loadGraphData(host as unknown as OpenClawApp, apiBase);
   }
   if (host.tab === "debug") {
     await loadDebug(host as unknown as OpenClawApp);
