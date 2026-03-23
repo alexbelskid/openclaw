@@ -67,6 +67,7 @@ import {
   saveExecApprovals,
   updateExecApprovalsFormValue,
 } from "./controllers/exec-approvals.ts";
+import { loadGraphData, loadNodeContent } from "./controllers/graph.ts";
 import { loadLogs } from "./controllers/logs.ts";
 import { loadNodes } from "./controllers/nodes.ts";
 import { loadPresence } from "./controllers/presence.ts";
@@ -123,6 +124,7 @@ function createLazy<T>(loader: () => Promise<T>): () => T | null {
 
 const lazyAgents = createLazy(() => import("./views/agents.ts"));
 const lazyActivityFeed = createLazy(() => import("./views/activity-feed.ts"));
+const lazyGraph = createLazy(() => import("./views/graph.ts"));
 const lazyConnections = createLazy(() => import("./views/connections.ts"));
 const lazyChannels = createLazy(() => import("./views/channels.ts"));
 const lazyCron = createLazy(() => import("./views/cron.ts"));
@@ -811,6 +813,38 @@ export function renderApp(state: AppViewState) {
         }
 
         ${renderUsageTab(state)}
+
+        ${
+          state.tab === "graph"
+            ? lazyRender(lazyGraph, (m) => {
+                const apiBase = typeof window !== "undefined" ? window.location.origin : "";
+                const token = (state as Record<string, unknown>).graphApiToken as string ?? "";
+                return m.renderGraph({
+                  loading: state.graphLoading ?? false,
+                  error: state.graphError ?? null,
+                  nodes: state.graphNodes ?? [],
+                  edges: state.graphEdges ?? [],
+                  selectedNode: state.graphSelectedNode ?? null,
+                  selectedContent: state.graphSelectedContent ?? null,
+                  showConfigFiles: state.graphShowConfigFiles ?? false,
+                  onSelectNode: (id: string) => {
+                    loadNodeContent(state, id, apiBase, token).then(() => requestHostUpdate?.());
+                  },
+                  onClosePreview: () => {
+                    state.graphSelectedNode = null;
+                    state.graphSelectedContent = null;
+                    requestHostUpdate?.();
+                  },
+                  onRefresh: () => {
+                    loadGraphData(state, apiBase, token).then(() => requestHostUpdate?.());
+                  },
+                  onToggleConfigFiles: () => {
+                    state.graphShowConfigFiles = !(state.graphShowConfigFiles ?? false);
+                    requestHostUpdate?.();
+                  },
+                });
+              })
+            : nothing}
 
         ${
           state.tab === "activity"

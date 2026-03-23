@@ -17,6 +17,7 @@ import { loadCronJobs, loadCronRuns, loadCronStatus } from "./controllers/cron.t
 import { loadDebug } from "./controllers/debug.ts";
 import { loadDevices } from "./controllers/devices.ts";
 import { loadExecApprovals } from "./controllers/exec-approvals.ts";
+import { loadGraphData } from "./controllers/graph.ts";
 import { loadLogs } from "./controllers/logs.ts";
 import { loadNodes } from "./controllers/nodes.ts";
 import { loadPresence } from "./controllers/presence.ts";
@@ -280,6 +281,11 @@ export async function refreshActiveTab(host: SettingsHost) {
   ) {
     await loadConfigSchema(host as unknown as OpenClawApp);
     await loadConfig(host as unknown as OpenClawApp);
+  }
+  if (host.tab === "graph") {
+    const apiBase = typeof window !== "undefined" ? window.location.origin : "";
+    const token = (host as Record<string, unknown>).graphApiToken as string ?? "";
+    await loadGraphData(host as unknown as OpenClawApp, apiBase, token);
   }
   if (host.tab === "debug") {
     await loadDebug(host as unknown as OpenClawApp);

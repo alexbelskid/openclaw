@@ -432,6 +432,16 @@ export class OpenClawApp extends LitElement {
   @state() logsMaxBytes = 250_000;
   @state() logsAtBottom = true;
 
+  // Graph view state
+  @state() graphLoading = false;
+  @state() graphError: string | null = null;
+  @state() graphNodes: import("./views/graph.ts").GraphNode[] = [];
+  @state() graphEdges: import("./views/graph.ts").GraphEdge[] = [];
+  @state() graphSelectedNode: string | null = null;
+  @state() graphSelectedContent: string | null = null;
+  @state() graphShowConfigFiles = false;
+  graphApiToken = "";
+
   client: GatewayBrowserClient | null = null;
   private chatScrollFrame: number | null = null;
   private chatScrollTimeout: number | null = null;

@@ -34,6 +34,7 @@ import type {
   ToolsCatalogResult,
 } from "./types.ts";
 import type { ChatAttachment, ChatQueueItem } from "./ui-types.ts";
+import type { GraphNode, GraphEdge } from "./views/graph.ts";
 import type { NostrProfileFormState } from "./views/channels.nostr-profile-form.ts";
 import type { SessionLogEntry } from "./views/usage.ts";
 
@@ -366,6 +367,13 @@ export type AppViewState = {
     resetChatScroll: () => void;
     exportLogs: (lines: string[], label: string) => void;
     handleLogsScroll: (event: Event) => void;
+    graphLoading: boolean;
+    graphError: string | null;
+    graphNodes: GraphNode[];
+    graphEdges: GraphEdge[];
+    graphSelectedNode: string | null;
+    graphSelectedContent: string | null;
+    graphShowConfigFiles: boolean;
     handleOpenSidebar: (content: string) => void;
     handleCloseSidebar: () => void;
     handleSplitRatioChange: (ratio: number) => void;
