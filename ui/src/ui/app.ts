@@ -440,7 +440,7 @@ export class OpenClawApp extends LitElement {
   @state() graphSelectedNode: string | null = null;
   @state() graphSelectedContent: string | null = null;
   @state() graphShowConfigFiles = false;
-  graphApiToken = "";
+  graphApiToken = (typeof window !== "undefined" && (window as Record<string, unknown>).__BELAGENT_MEMORY_TOKEN__ as string) || "";
 
   client: GatewayBrowserClient | null = null;
   private chatScrollFrame: number | null = null;
