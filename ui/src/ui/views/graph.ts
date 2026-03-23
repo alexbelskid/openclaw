@@ -165,7 +165,7 @@ export class BelagentGraphCanvas extends LitElement {
       d3.zoomIdentity.translate(width / 2, height / 2),
     );
 
-    // Force simulation — run to completion synchronously, then freeze
+    // Force simulation — pre-compute layout silently, then keep alive for drag
     this._simulation?.stop();
     const simulation = d3
       .forceSimulation<GraphNode>(nodes)
@@ -179,20 +179,14 @@ export class BelagentGraphCanvas extends LitElement {
       .force("charge", d3.forceManyBody().strength(-300))
       .force("center", d3.forceCenter(0, 0))
       .force("collide", d3.forceCollide<GraphNode>().radius((d) => nodeRadius(d) + 4))
-      .stop(); // don't auto-run
+      .stop(); // don't auto-run yet
 
-    // Run simulation synchronously to completion
-    for (let i = 0; i < 300; i++) simulation.tick();
-
-    // Fix all node positions so nothing moves
-    for (const n of nodes) {
-      n.fx = n.x;
-      n.fy = n.y;
-    }
+    // Pre-compute 500 ticks silently (no DOM updates)
+    for (let i = 0; i < 500; i++) simulation.tick();
 
     this._simulation = simulation;
 
-    // Edges — render at final positions
+    // Edges — render at pre-computed positions
     const link = g
       .append("g")
       .attr("class", "edges")
@@ -207,7 +201,7 @@ export class BelagentGraphCanvas extends LitElement {
       .attr("x2", (d) => (d.target as GraphNode).x ?? 0)
       .attr("y2", (d) => (d.target as GraphNode).y ?? 0);
 
-    // Node groups — render at final positions
+    // Node groups — render at pre-computed positions
     const node = g
       .append("g")
       .attr("class", "nodes")
@@ -219,33 +213,32 @@ export class BelagentGraphCanvas extends LitElement {
       .call(
         d3
           .drag<SVGGElement, GraphNode>()
-          .on("start", (_event, d) => {
+          .on("start", (event, d) => {
+            if (!event.active) simulation.alphaTarget(0.3).restart();
             d.fx = d.x;
             d.fy = d.y;
           })
           .on("drag", (event, d) => {
             d.fx = event.x;
             d.fy = event.y;
-            d.x = event.x;
-            d.y = event.y;
-            // Update only this node and its edges — no simulation restart
-            d3.select(event.sourceEvent.target.closest("g"))
-              .attr("transform", `translate(${event.x},${event.y})`);
-            link
-              .filter((l) => {
-                const src = (l.source as GraphNode).id;
-                const tgt = (l.target as GraphNode).id;
-                return src === d.id || tgt === d.id;
-              })
-              .attr("x1", (l) => (l.source as GraphNode).x ?? 0)
-              .attr("y1", (l) => (l.source as GraphNode).y ?? 0)
-              .attr("x2", (l) => (l.target as GraphNode).x ?? 0)
-              .attr("y2", (l) => (l.target as GraphNode).y ?? 0);
           })
-          .on("end", (_event, _d) => {
-            // Keep fixed position after drag
+          .on("end", (event, d) => {
+            if (!event.active) simulation.alphaTarget(0);
+            // Keep node fixed at drop position
+            d.fx = d.x;
+            d.fy = d.y;
           }),
       );
+
+    // Tick handler — active for drag physics, dormant otherwise
+    simulation.on("tick", () => {
+      link
+        .attr("x1", (d) => (d.source as GraphNode).x ?? 0)
+        .attr("y1", (d) => (d.source as GraphNode).y ?? 0)
+        .attr("x2", (d) => (d.target as GraphNode).x ?? 0)
+        .attr("y2", (d) => (d.target as GraphNode).y ?? 0);
+      node.attr("transform", (d) => `translate(${d.x ?? 0},${d.y ?? 0})`);
+    });
 
     // Node circles
     node
