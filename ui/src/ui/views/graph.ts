@@ -86,8 +86,9 @@ export class BelagentGraphCanvas extends LitElement {
 
   @query("svg") private svgEl!: SVGSVGElement;
 
-  @state() private _initialized = false;
-
+  private _initialized = false;
+  private _prevNodesJson = "";
+  private _prevEdgesJson = "";
   private _simulation: d3.Simulation<GraphNode, GraphEdge> | null = null;
   private _resizeObserver: ResizeObserver | null = null;
 
@@ -98,13 +99,19 @@ export class BelagentGraphCanvas extends LitElement {
   override updated(changed: Map<string, unknown>) {
     if (!this.svgEl) return;
 
-    const nodesChanged = changed.has("nodes");
-    const selectedChanged = changed.has("selectedNode");
+    // Only rebuild graph if actual data changed (not just reference)
+    const nodesJson = JSON.stringify(this.nodes.map((n) => n.id).sort());
+    const edgesJson = JSON.stringify(
+      this.edges.map((e) => `${typeof e.source === "object" ? e.source.id : e.source}-${typeof e.target === "object" ? e.target.id : e.target}`).sort(),
+    );
+    const dataChanged = nodesJson !== this._prevNodesJson || edgesJson !== this._prevEdgesJson;
 
-    if (nodesChanged || !this._initialized) {
+    if (dataChanged || !this._initialized) {
+      this._prevNodesJson = nodesJson;
+      this._prevEdgesJson = edgesJson;
       this._initGraph();
       this._initialized = true;
-    } else if (selectedChanged) {
+    } else if (changed.has("selectedNode")) {
       this._updateSelection();
     }
   }
