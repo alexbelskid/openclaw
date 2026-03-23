@@ -4,6 +4,10 @@ import type { IconName } from "./icons.js";
 export const TAB_GROUPS = [
   { label: "chat", tabs: ["chat"] },
   {
+    label: "belagent",
+    tabs: ["activity", "connections"],
+  },
+  {
     label: "control",
     tabs: ["overview", "channels", "instances", "sessions", "usage", "cron"],
   },
@@ -34,6 +38,8 @@ export type Tab =
   | "skills"
   | "nodes"
   | "chat"
+  | "activity"
+  | "connections"
   | "config"
   | "communications"
   | "appearance"
@@ -54,6 +60,8 @@ const TAB_PATHS: Record<Tab, string> = {
   skills: "/skills",
   nodes: "/nodes",
   chat: "/chat",
+  activity: "/activity",
+  connections: "/connections",
   config: "/config",
   communications: "/communications",
   appearance: "/appearance",
@@ -163,6 +171,10 @@ export function iconForTab(tab: Tab): IconName {
       return "barChart";
     case "cron":
       return "loader";
+    case "activity":
+      return "barChart";
+    case "connections":
+      return "link";
     case "skills":
       return "zap";
     case "nodes":

@@ -122,6 +122,8 @@ function createLazy<T>(loader: () => Promise<T>): () => T | null {
 }
 
 const lazyAgents = createLazy(() => import("./views/agents.ts"));
+const lazyActivityFeed = createLazy(() => import("./views/activity-feed.ts"));
+const lazyConnections = createLazy(() => import("./views/connections.ts"));
 const lazyChannels = createLazy(() => import("./views/channels.ts"));
 const lazyCron = createLazy(() => import("./views/cron.ts"));
 const lazyDebug = createLazy(() => import("./views/debug.ts"));
@@ -809,6 +811,27 @@ export function renderApp(state: AppViewState) {
         }
 
         ${renderUsageTab(state)}
+
+        ${
+          state.tab === "activity"
+            ? lazyRender(lazyActivityFeed, (m) =>
+                m.renderActivityFeed({
+                  loading: state.sessionsLoading ?? false,
+                  events: m.eventsFromSessions(state.sessionsList ?? []),
+                  sessions: state.sessionsList ?? [],
+                  onRefresh: () => app.dispatch({ type: "sessions/load" }),
+                }))
+            : nothing}
+
+        ${
+          state.tab === "connections"
+            ? lazyRender(lazyConnections, (m) =>
+                m.renderConnections({
+                  channels: state.channelsMeta ?? [],
+                  onConnect: (id) => app.navigate(pathForTab("channels", state.basePath)),
+                  onConfigure: (id) => app.navigate(pathForTab("channels", state.basePath)),
+                }))
+            : nothing}
 
         ${
           state.tab === "cron"
