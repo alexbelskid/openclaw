@@ -8,6 +8,10 @@ export type GraphState = {
   graphSelectedNode: string | null;
   graphSelectedContent: string | null;
   graphShowConfigFiles: boolean;
+  graphEditMode: boolean;
+  graphEditDraft: string | null;
+  graphSaving: boolean;
+  graphSaveError: string | null;
 };
 
 type MemoryFile = {
@@ -232,5 +236,48 @@ export async function loadNodeContent(
     state.graphSelectedContent = file?.content ?? "File not found";
   } catch {
     state.graphSelectedContent = "Failed to load file content";
+  }
+}
+
+export async function saveNodeContent(
+  state: GraphState,
+  apiBase: string,
+): Promise<boolean> {
+  const nodeId = state.graphSelectedNode;
+  const content = state.graphEditDraft;
+  if (!nodeId || content === null) return false;
+
+  state.graphSaving = true;
+  state.graphSaveError = null;
+
+  try {
+    const res = await fetch(`${apiBase}/api/memory/files/${nodeId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content }),
+    });
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+      throw new Error(data.error ?? `HTTP ${res.status}`);
+    }
+
+    // Update cache
+    if (_cachedFiles) {
+      const idx = _cachedFiles.findIndex((f) => f.path === nodeId);
+      if (idx >= 0) {
+        _cachedFiles[idx] = { ..._cachedFiles[idx], content };
+      }
+    }
+
+    state.graphSelectedContent = content;
+    state.graphEditMode = false;
+    state.graphEditDraft = null;
+    return true;
+  } catch (err) {
+    state.graphSaveError = err instanceof Error ? err.message : String(err);
+    return false;
+  } finally {
+    state.graphSaving = false;
   }
 }

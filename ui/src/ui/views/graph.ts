@@ -32,10 +32,17 @@ export type GraphViewProps = {
   selectedNode: string | null;
   selectedContent: string | null;
   showConfigFiles: boolean;
+  editMode: boolean;
+  editDraft: string | null;
+  saving: boolean;
+  saveError: string | null;
   onSelectNode: (id: string) => void;
   onClosePreview: () => void;
   onRefresh: () => void;
   onToggleConfigFiles: () => void;
+  onToggleEditMode: () => void;
+  onEditChange: (content: string) => void;
+  onSave: () => void;
 };
 
 // ── Color & sizing helpers ─────────────────────────────────────
@@ -151,7 +158,7 @@ export class BelagentGraphCanvas extends LitElement {
       d3.zoomIdentity.translate(width / 2, height / 2),
     );
 
-    // Force simulation — settle quickly, then stop
+    // Force simulation — run to completion synchronously, then freeze
     this._simulation?.stop();
     const simulation = d3
       .forceSimulation<GraphNode>(nodes)
@@ -165,13 +172,20 @@ export class BelagentGraphCanvas extends LitElement {
       .force("charge", d3.forceManyBody().strength(-300))
       .force("center", d3.forceCenter(0, 0))
       .force("collide", d3.forceCollide<GraphNode>().radius((d) => nodeRadius(d) + 4))
-      .alphaDecay(0.05)
-      .alphaMin(0.001)
-      .velocityDecay(0.4);
+      .stop(); // don't auto-run
+
+    // Run simulation synchronously to completion
+    for (let i = 0; i < 300; i++) simulation.tick();
+
+    // Fix all node positions so nothing moves
+    for (const n of nodes) {
+      n.fx = n.x;
+      n.fy = n.y;
+    }
 
     this._simulation = simulation;
 
-    // Edges
+    // Edges — render at final positions
     const link = g
       .append("g")
       .attr("class", "edges")
@@ -180,9 +194,13 @@ export class BelagentGraphCanvas extends LitElement {
       .join("line")
       .attr("stroke", "#2e3040")
       .attr("stroke-opacity", 0.5)
-      .attr("stroke-width", 1);
+      .attr("stroke-width", 1)
+      .attr("x1", (d) => (d.source as GraphNode).x ?? 0)
+      .attr("y1", (d) => (d.source as GraphNode).y ?? 0)
+      .attr("x2", (d) => (d.target as GraphNode).x ?? 0)
+      .attr("y2", (d) => (d.target as GraphNode).y ?? 0);
 
-    // Node groups
+    // Node groups — render at final positions
     const node = g
       .append("g")
       .attr("class", "nodes")
@@ -190,22 +208,35 @@ export class BelagentGraphCanvas extends LitElement {
       .data(nodes)
       .join("g")
       .attr("cursor", "pointer")
+      .attr("transform", (d) => `translate(${d.x ?? 0},${d.y ?? 0})`)
       .call(
         d3
           .drag<SVGGElement, GraphNode>()
-          .on("start", (event, d) => {
-            if (!event.active) simulation.alphaTarget(0.3).restart();
+          .on("start", (_event, d) => {
             d.fx = d.x;
             d.fy = d.y;
           })
           .on("drag", (event, d) => {
             d.fx = event.x;
             d.fy = event.y;
+            d.x = event.x;
+            d.y = event.y;
+            // Update only this node and its edges — no simulation restart
+            d3.select(event.sourceEvent.target.closest("g"))
+              .attr("transform", `translate(${event.x},${event.y})`);
+            link
+              .filter((l) => {
+                const src = (l.source as GraphNode).id;
+                const tgt = (l.target as GraphNode).id;
+                return src === d.id || tgt === d.id;
+              })
+              .attr("x1", (l) => (l.source as GraphNode).x ?? 0)
+              .attr("y1", (l) => (l.source as GraphNode).y ?? 0)
+              .attr("x2", (l) => (l.target as GraphNode).x ?? 0)
+              .attr("y2", (l) => (l.target as GraphNode).y ?? 0);
           })
-          .on("end", (event, d) => {
-            if (!event.active) simulation.alphaTarget(0);
-            d.fx = null;
-            d.fy = null;
+          .on("end", (_event, _d) => {
+            // Keep fixed position after drag
           }),
       );
 
@@ -245,7 +276,6 @@ export class BelagentGraphCanvas extends LitElement {
         d3.select(this).select("circle").attr("opacity", 1).attr("stroke-width", 3);
         d3.select(this).select("text").attr("fill-opacity", 1);
 
-        // Highlight connected edges
         link
           .attr("stroke-opacity", (l) => {
             const src = typeof l.source === "object" ? l.source.id : l.source;
@@ -264,27 +294,8 @@ export class BelagentGraphCanvas extends LitElement {
         link.attr("stroke-opacity", 0.5).attr("stroke", "#2e3040");
       });
 
-    // Tick
-    simulation.on("tick", () => {
-      link
-        .attr("x1", (d) => (d.source as GraphNode).x ?? 0)
-        .attr("y1", (d) => (d.source as GraphNode).y ?? 0)
-        .attr("x2", (d) => (d.target as GraphNode).x ?? 0)
-        .attr("y2", (d) => (d.target as GraphNode).y ?? 0);
-
-      node.attr("transform", (d) => `translate(${d.x ?? 0},${d.y ?? 0})`);
-    });
-
     // Update selection highlight
     this._updateSelection();
-
-    // Handle resize
-    this._resizeObserver?.disconnect();
-    this._resizeObserver = new ResizeObserver(() => {
-      const newRect = this.svgEl.getBoundingClientRect();
-      svg.attr("viewBox", `0 0 ${newRect.width} ${newRect.height}`);
-    });
-    this._resizeObserver.observe(this.svgEl);
   }
 
   private _updateSelection() {
@@ -312,10 +323,17 @@ export function renderGraph(props: GraphViewProps) {
     selectedNode,
     selectedContent,
     showConfigFiles,
+    editMode,
+    editDraft,
+    saving,
+    saveError,
     onSelectNode,
     onClosePreview,
     onRefresh,
     onToggleConfigFiles,
+    onToggleEditMode,
+    onEditChange,
+    onSave,
   } = props;
 
   const filteredNodes = showConfigFiles
@@ -477,6 +495,47 @@ export function renderGraph(props: GraphViewProps) {
         }
         .graph-panel-body a:hover { text-decoration: underline; }
 
+        /* Edit mode */
+        .graph-panel-actions {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          padding: 8px 16px;
+          border-bottom: 1px solid var(--c-border, #2a2a3d);
+        }
+        .graph-panel-actions .graph-btn { font-size: 11px; }
+        .graph-panel-save {
+          background: var(--c-accent, #ff5c5c);
+          border: none;
+          border-radius: 6px;
+          padding: 5px 12px;
+          font-size: 11px;
+          cursor: pointer;
+          color: #fff;
+          font-weight: 600;
+        }
+        .graph-panel-save:hover { opacity: 0.9; }
+        .graph-panel-save:disabled { opacity: 0.5; cursor: not-allowed; }
+        .graph-panel-error {
+          font-size: 11px;
+          color: var(--destructive, #ef4444);
+          padding: 0 16px 4px;
+        }
+        .graph-panel-textarea {
+          flex: 1;
+          width: 100%;
+          box-sizing: border-box;
+          background: var(--bg, #0e1015);
+          color: var(--c-text, #d4d4d8);
+          border: none;
+          padding: 16px;
+          font-size: 13px;
+          font-family: monospace;
+          line-height: 1.6;
+          resize: none;
+          outline: none;
+        }
+
         /* Legend */
         .graph-legend {
           position: absolute;
@@ -566,7 +625,31 @@ export function renderGraph(props: GraphViewProps) {
                 </div>
                 <button class="graph-panel-close" @click=${onClosePreview}>✕</button>
               </div>
-              <div class="graph-panel-body" .innerHTML=${renderedContent}></div>
+              <div class="graph-panel-actions">
+                <button
+                  class="graph-btn ${!editMode ? "graph-btn--active" : ""}"
+                  @click=${() => { if (editMode) onToggleEditMode(); }}
+                >Просмотр</button>
+                <button
+                  class="graph-btn ${editMode ? "graph-btn--active" : ""}"
+                  @click=${() => { if (!editMode) onToggleEditMode(); }}
+                >Редактор</button>
+                ${editMode
+                  ? html`<button
+                      class="graph-panel-save"
+                      ?disabled=${saving}
+                      @click=${onSave}
+                    >${saving ? "Сохранение..." : "Сохранить"}</button>`
+                  : nothing}
+              </div>
+              ${saveError ? html`<div class="graph-panel-error">${saveError}</div>` : nothing}
+              ${editMode
+                ? html`<textarea
+                    class="graph-panel-textarea"
+                    .value=${editDraft ?? selectedContent ?? ""}
+                    @input=${(e: Event) => onEditChange((e.target as HTMLTextAreaElement).value)}
+                  ></textarea>`
+                : html`<div class="graph-panel-body" .innerHTML=${renderedContent}></div>`}
             </div>
           `
         : nothing}

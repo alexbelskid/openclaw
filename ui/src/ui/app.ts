@@ -440,6 +440,10 @@ export class OpenClawApp extends LitElement {
   @state() graphSelectedNode: string | null = null;
   @state() graphSelectedContent: string | null = null;
   @state() graphShowConfigFiles = false;
+  @state() graphEditMode = false;
+  @state() graphEditDraft: string | null = null;
+  @state() graphSaving = false;
+  @state() graphSaveError: string | null = null;
 
   client: GatewayBrowserClient | null = null;
   private chatScrollFrame: number | null = null;

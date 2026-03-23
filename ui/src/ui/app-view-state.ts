@@ -374,6 +374,10 @@ export type AppViewState = {
     graphSelectedNode: string | null;
     graphSelectedContent: string | null;
     graphShowConfigFiles: boolean;
+    graphEditMode: boolean;
+    graphEditDraft: string | null;
+    graphSaving: boolean;
+    graphSaveError: string | null;
     handleOpenSidebar: (content: string) => void;
     handleCloseSidebar: () => void;
     handleSplitRatioChange: (ratio: number) => void;

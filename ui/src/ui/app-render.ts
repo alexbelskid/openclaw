@@ -67,7 +67,7 @@ import {
   saveExecApprovals,
   updateExecApprovalsFormValue,
 } from "./controllers/exec-approvals.ts";
-import { loadGraphData, loadNodeContent } from "./controllers/graph.ts";
+import { loadGraphData, loadNodeContent, saveNodeContent } from "./controllers/graph.ts";
 import { loadLogs } from "./controllers/logs.ts";
 import { loadNodes } from "./controllers/nodes.ts";
 import { loadPresence } from "./controllers/presence.ts";
@@ -826,12 +826,22 @@ export function renderApp(state: AppViewState) {
                   selectedNode: state.graphSelectedNode ?? null,
                   selectedContent: state.graphSelectedContent ?? null,
                   showConfigFiles: state.graphShowConfigFiles ?? false,
+                  editMode: state.graphEditMode ?? false,
+                  editDraft: state.graphEditDraft ?? null,
+                  saving: state.graphSaving ?? false,
+                  saveError: state.graphSaveError ?? null,
                   onSelectNode: (id: string) => {
+                    state.graphEditMode = false;
+                    state.graphEditDraft = null;
+                    state.graphSaveError = null;
                     loadNodeContent(state, id, apiBase).then(() => requestHostUpdate?.());
                   },
                   onClosePreview: () => {
                     state.graphSelectedNode = null;
                     state.graphSelectedContent = null;
+                    state.graphEditMode = false;
+                    state.graphEditDraft = null;
+                    state.graphSaveError = null;
                     requestHostUpdate?.();
                   },
                   onRefresh: () => {
@@ -840,6 +850,27 @@ export function renderApp(state: AppViewState) {
                   onToggleConfigFiles: () => {
                     state.graphShowConfigFiles = !(state.graphShowConfigFiles ?? false);
                     requestHostUpdate?.();
+                  },
+                  onToggleEditMode: () => {
+                    state.graphEditMode = !state.graphEditMode;
+                    if (state.graphEditMode) {
+                      state.graphEditDraft = state.graphSelectedContent ?? "";
+                    }
+                    state.graphSaveError = null;
+                    requestHostUpdate?.();
+                  },
+                  onEditChange: (content: string) => {
+                    state.graphEditDraft = content;
+                    requestHostUpdate?.();
+                  },
+                  onSave: () => {
+                    saveNodeContent(state, apiBase).then((ok) => {
+                      if (ok) {
+                        // Refresh graph to pick up new/changed links
+                        loadGraphData(state, apiBase).then(() => requestHostUpdate?.());
+                      }
+                      requestHostUpdate?.();
+                    });
                   },
                 });
               })

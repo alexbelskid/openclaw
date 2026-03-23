@@ -7,6 +7,7 @@ const TOKEN = process.env.MEMORY_API_TOKEN || "";
 const WORKSPACE = process.env.WORKSPACE_DIR || "/root/.openclaw/workspace";
 
 const app = express();
+app.use(express.json());
 
 // Auth middleware — optional, only enforced if TOKEN is set.
 // When behind nginx on localhost, token can be omitted.
@@ -83,6 +84,46 @@ function collectMdFiles(dir, agent, prefix, out) {
     }
   }
 }
+
+/**
+ * PUT /api/memory/files/:path(*)
+ *
+ * Save file content. Body: { content: string }
+ * Path must resolve within WORKSPACE and end in .md.
+ */
+app.put("/api/memory/files/:path(*)", (req, res) => {
+  try {
+    const relPath = req.params.path;
+    if (!relPath || !relPath.endsWith(".md")) {
+      return res.status(400).json({ error: "only .md files allowed" });
+    }
+
+    const filePath = path.resolve(WORKSPACE, relPath);
+    const resolvedWorkspace = path.resolve(WORKSPACE);
+
+    // Security: ensure path stays within workspace
+    if (!filePath.startsWith(resolvedWorkspace + path.sep) && filePath !== resolvedWorkspace) {
+      return res.status(403).json({ error: "forbidden" });
+    }
+
+    const content = req.body?.content;
+    if (typeof content !== "string") {
+      return res.status(400).json({ error: "content must be a string" });
+    }
+
+    // Ensure parent directory exists
+    const dir = path.dirname(filePath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+
+    fs.writeFileSync(filePath, content, "utf-8");
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("Error saving file:", err.message);
+    res.status(500).json({ error: "failed to save file" });
+  }
+});
 
 // Health check
 app.get("/api/memory/health", (_req, res) => {
