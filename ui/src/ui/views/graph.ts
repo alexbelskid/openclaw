@@ -151,7 +151,7 @@ export class BelagentGraphCanvas extends LitElement {
       d3.zoomIdentity.translate(width / 2, height / 2),
     );
 
-    // Force simulation
+    // Force simulation — settle quickly, then stop
     this._simulation?.stop();
     const simulation = d3
       .forceSimulation<GraphNode>(nodes)
@@ -164,7 +164,10 @@ export class BelagentGraphCanvas extends LitElement {
       )
       .force("charge", d3.forceManyBody().strength(-300))
       .force("center", d3.forceCenter(0, 0))
-      .force("collide", d3.forceCollide<GraphNode>().radius((d) => nodeRadius(d) + 4));
+      .force("collide", d3.forceCollide<GraphNode>().radius((d) => nodeRadius(d) + 4))
+      .alphaDecay(0.05)
+      .alphaMin(0.001)
+      .velocityDecay(0.4);
 
     this._simulation = simulation;
 
