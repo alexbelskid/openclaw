@@ -1,0 +1,8 @@
+{
+  "name": "gws",
+  "displayName": "Google Workspace (gws CLI)",
+  "description": "Google Workspace integration via official gws CLI — Gmail, Drive, Calendar, Sheets, Docs",
+  "version": "0.1.0",
+  "kind": "skill",
+  "skills": ["gws"]
+}

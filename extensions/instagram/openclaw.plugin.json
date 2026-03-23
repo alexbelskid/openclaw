@@ -1,0 +1,8 @@
+{
+  "name": "instagram",
+  "displayName": "Instagram / Meta",
+  "description": "Instagram and Meta Graph API integration — posts, DMs, insights, comments",
+  "version": "0.1.0",
+  "kind": "skill",
+  "skills": ["instagram"]
+}
