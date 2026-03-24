@@ -490,8 +490,8 @@ export function renderApp(state: AppViewState) {
           >
             <span class="nav-collapse-toggle__icon" aria-hidden="true">${icons.menu}</span>
           </button>
-          <div class="topnav-shell__content belagent-topbar-pills">
-            ${renderChatSessionSelect(state)}
+          <div class="topnav-shell__content">
+            <dashboard-header .tab=${state.tab}></dashboard-header>
           </div>
           <div class="topnav-shell__actions">
             <button
@@ -655,7 +655,7 @@ export function renderApp(state: AppViewState) {
               <div>
                 ${
                   isChat
-                    ? nothing
+                    ? renderChatSessionSelect(state)
                     : html`<div class="page-title">${titleForTab(state.tab)}</div>`
                 }
                 ${isChat ? nothing : html`<div class="page-sub">${subtitleForTab(state.tab)}</div>`}
