@@ -82,7 +82,7 @@ import {
 import "./components/dashboard-header.ts";
 import { buildExternalLinkRel, EXTERNAL_LINK_TARGET } from "./external-link.ts";
 import { icons } from "./icons.ts";
-import { normalizeBasePath, TAB_GROUPS, subtitleForTab, titleForTab } from "./navigation.ts";
+import { normalizeBasePath, MAIN_TABS, ADVANCED_TABS, TAB_GROUPS, subtitleForTab, titleForTab, labelForTab, pathForTab, iconForTab, type Tab } from "./navigation.ts";
 import { agentLogoUrl } from "./views/agents-utils.ts";
 import {
   resolveAgentConfig,
@@ -138,6 +138,65 @@ const lazySkills = createLazy(() => import("./views/skills.ts"));
 function lazyRender<M>(getter: () => M | null, render: (mod: M) => unknown) {
   const mod = getter();
   return mod ? render(mod) : nothing;
+}
+
+// Belagent tab renderer — uses labelForTab for custom labels and resolves
+// alias tabs (tasks→activity, automations→cron) to their underlying routes.
+function resolveTabRoute(tab: Tab): Tab {
+  if (tab === "tasks") return "activity";
+  if (tab === "automations") return "cron";
+  return tab;
+}
+
+function renderBelagentTab(state: AppViewState, tab: Tab, opts?: { collapsed?: boolean }) {
+  const routeTab = resolveTabRoute(tab);
+  const href = pathForTab(tab, state.basePath);
+  const isActive = state.tab === tab || state.tab === routeTab;
+  const collapsed = opts?.collapsed ?? state.settings.navCollapsed;
+  return html`
+    <a
+      href=${href}
+      class="nav-item ${isActive ? "nav-item--active" : ""}"
+      @click=${(event: MouseEvent) => {
+        if (
+          event.defaultPrevented ||
+          event.button !== 0 ||
+          event.metaKey ||
+          event.ctrlKey ||
+          event.shiftKey ||
+          event.altKey
+        ) {
+          return;
+        }
+        event.preventDefault();
+        if (tab === "chat") {
+          const snapshot = state.hello?.snapshot as
+            | { sessionDefaults?: { mainSessionKey?: string; mainKey?: string } }
+            | undefined;
+          const mainSessionKey =
+            snapshot?.sessionDefaults?.mainSessionKey?.trim() ||
+            snapshot?.sessionDefaults?.mainKey?.trim() ||
+            "main";
+          if (state.sessionKey !== mainSessionKey) {
+            state.sessionKey = mainSessionKey;
+            state.chatMessage = "";
+            state.chatStream = null;
+            state.chatRunId = null;
+            state.applySettings({
+              ...state.settings,
+              sessionKey: mainSessionKey,
+              lastActiveSessionKey: mainSessionKey,
+            });
+          }
+        }
+        state.setTab(routeTab);
+      }}
+      title=${labelForTab(tab)}
+    >
+      <span class="nav-item__icon" aria-hidden="true">${icons[iconForTab(tab)]}</span>
+      ${!collapsed ? html`<span class="nav-item__text">${labelForTab(tab)}</span>` : nothing}
+    </a>
+  `;
 }
 
 const UPDATE_BANNER_DISMISS_KEY = "openclaw:control-ui:update-banner-dismissed:v1";
@@ -431,8 +490,8 @@ export function renderApp(state: AppViewState) {
           >
             <span class="nav-collapse-toggle__icon" aria-hidden="true">${icons.menu}</span>
           </button>
-          <div class="topnav-shell__content">
-            <dashboard-header .tab=${state.tab}></dashboard-header>
+          <div class="topnav-shell__content belagent-topbar-pills">
+            ${renderChatSessionSelect(state)}
           </div>
           <div class="topnav-shell__actions">
             <button
@@ -440,7 +499,7 @@ export function renderApp(state: AppViewState) {
               @click=${() => {
                 state.paletteOpen = !state.paletteOpen;
               }}
-              title="Search or jump to… (⌘K)"
+              title="Search or jump to... (⌘K)"
               aria-label="Open command palette"
             >
               <span class="topbar-search__label">${t("common.search")}</span>
@@ -462,10 +521,8 @@ export function renderApp(state: AppViewState) {
                   navCollapsed
                     ? nothing
                     : html`
-                        <img class="sidebar-brand__logo" src="${agentLogoUrl(basePath)}" alt="OpenClaw" />
                         <span class="sidebar-brand__copy">
-                          <span class="sidebar-brand__eyebrow">${t("nav.control")}</span>
-                          <span class="sidebar-brand__title">OpenClaw</span>
+                          <span class="sidebar-brand__title belagent-logo">Belagent</span>
                         </span>
                       `
                 }
@@ -486,13 +543,23 @@ export function renderApp(state: AppViewState) {
             </div>
             <div class="sidebar-shell__body">
               <nav class="sidebar-nav">
-                ${TAB_GROUPS.map((group) => {
-                  const isGroupCollapsed = state.settings.navGroupsCollapsed[group.label] ?? false;
-                  const hasActiveTab = group.tabs.some((tab) => tab === state.tab);
-                  const showItems = navCollapsed || hasActiveTab || !isGroupCollapsed;
+                <!-- Main nav items -->
+                <section class="nav-section">
+                  <div class="nav-section__items">
+                    ${MAIN_TABS.map((tab) => renderBelagentTab(state, tab as Tab, { collapsed: navCollapsed }))}
+                  </div>
+                </section>
 
+                <!-- Divider -->
+                <div class="belagent-nav-divider"></div>
+
+                <!-- Advanced section (collapsed accordion) -->
+                ${(() => {
+                  const advancedCollapsed = state.settings.navGroupsCollapsed["advanced"] ?? true;
+                  const hasActiveAdvanced = ADVANCED_TABS.some((tab) => tab === state.tab);
+                  const showAdvanced = navCollapsed || hasActiveAdvanced || !advancedCollapsed;
                   return html`
-                    <section class="nav-section ${!showItems ? "nav-section--collapsed" : ""}">
+                    <section class="nav-section ${!showAdvanced ? "nav-section--collapsed" : ""}">
                       ${
                         !navCollapsed
                           ? html`
@@ -500,15 +567,15 @@ export function renderApp(state: AppViewState) {
                                 class="nav-section__label"
                                 @click=${() => {
                                   const next = { ...state.settings.navGroupsCollapsed };
-                                  next[group.label] = !isGroupCollapsed;
+                                  next["advanced"] = !advancedCollapsed;
                                   state.applySettings({
                                     ...state.settings,
                                     navGroupsCollapsed: next,
                                   });
                                 }}
-                                aria-expanded=${showItems}
+                                aria-expanded=${showAdvanced}
                               >
-                                <span class="nav-section__label-text">${t(`nav.${group.label}`)}</span>
+                                <span class="nav-section__label-text">Advanced</span>
                                 <span class="nav-section__chevron">
                                   ${icons.chevronDown}
                                 </span>
@@ -517,32 +584,15 @@ export function renderApp(state: AppViewState) {
                           : nothing
                       }
                       <div class="nav-section__items">
-                        ${group.tabs.map((tab) => renderTab(state, tab, { collapsed: navCollapsed }))}
+                        ${ADVANCED_TABS.map((tab) => renderBelagentTab(state, tab as Tab, { collapsed: navCollapsed }))}
                       </div>
                     </section>
                   `;
-                })}
+                })()}
               </nav>
             </div>
             <div class="sidebar-shell__footer">
               <div class="sidebar-utility-group">
-                <a
-                  class="nav-item nav-item--external sidebar-utility-link"
-                  href="https://docs.openclaw.ai"
-                  target=${EXTERNAL_LINK_TARGET}
-                  rel=${buildExternalLinkRel()}
-                  title="${t("common.docs")} (opens in new tab)"
-                >
-                  <span class="nav-item__icon" aria-hidden="true">${icons.book}</span>
-                  ${
-                    !navCollapsed
-                      ? html`
-                          <span class="nav-item__text">${t("common.docs")}</span>
-                          <span class="nav-item__external-icon">${icons.externalLink}</span>
-                        `
-                      : nothing
-                  }
-                </a>
                 <div class="sidebar-mode-switch">
                   ${renderTopbarThemeModeToggle(state)}
                 </div>
@@ -554,7 +604,6 @@ export function renderApp(state: AppViewState) {
                           ${
                             !navCollapsed
                               ? html`
-                                  <span class="sidebar-version__label">${t("common.version")}</span>
                                   <span class="sidebar-version__text">v${version}</span>
                                   ${renderSidebarConnectionStatus(state)}
                                 `
@@ -877,7 +926,7 @@ export function renderApp(state: AppViewState) {
             : nothing}
 
         ${
-          state.tab === "activity"
+          state.tab === "activity" || state.tab === "tasks"
             ? lazyRender(lazyActivityFeed, (m) =>
                 m.renderActivityFeed({
                   loading: state.sessionsLoading ?? false,
@@ -898,7 +947,7 @@ export function renderApp(state: AppViewState) {
             : nothing}
 
         ${
-          state.tab === "cron"
+          state.tab === "cron" || state.tab === "automations"
             ? lazyRender(lazyCron, (m) =>
                 m.renderCron({
                   basePath: state.basePath,

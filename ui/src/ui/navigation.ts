@@ -1,29 +1,32 @@
 import { t } from "../i18n/index.ts";
 import type { IconName } from "./icons.js";
 
+// Main nav — visible by default
+export const MAIN_TABS = [
+  "chat",
+  "tasks",
+  "automations",
+  "graph",
+  "skills",
+] as const;
+
+// Advanced section — collapsed accordion at bottom
+export const ADVANCED_TABS = [
+  "usage",
+  "connections",
+  "config",
+  "logs",
+] as const;
+
+// Legacy TAB_GROUPS kept for compatibility with existing rendering logic
 export const TAB_GROUPS = [
-  { label: "chat", tabs: ["chat"] },
   {
     label: "belagent",
-    tabs: ["graph", "activity", "connections"],
+    tabs: [...MAIN_TABS],
   },
   {
-    label: "control",
-    tabs: ["overview", "channels", "instances", "sessions", "usage", "cron"],
-  },
-  { label: "agent", tabs: ["agents", "skills", "nodes"] },
-  {
-    label: "settings",
-    tabs: [
-      "config",
-      "communications",
-      "appearance",
-      "automation",
-      "infrastructure",
-      "aiAgents",
-      "debug",
-      "logs",
-    ],
+    label: "advanced",
+    tabs: [...ADVANCED_TABS],
   },
 ] as const;
 
@@ -48,7 +51,9 @@ export type Tab =
   | "infrastructure"
   | "aiAgents"
   | "debug"
-  | "logs";
+  | "logs"
+  | "tasks"
+  | "automations";
 
 const TAB_PATHS: Record<Tab, string> = {
   agents: "/agents",
@@ -72,6 +77,8 @@ const TAB_PATHS: Record<Tab, string> = {
   aiAgents: "/ai-agents",
   debug: "/debug",
   logs: "/logs",
+  tasks: "/tasks",
+  automations: "/automations",
 };
 
 const PATH_TO_TAB = new Map(Object.entries(TAB_PATHS).map(([tab, path]) => [path, tab as Tab]));
@@ -172,6 +179,7 @@ export function iconForTab(tab: Tab): IconName {
     case "usage":
       return "barChart";
     case "cron":
+    case "automations":
       return "loader";
     case "graph":
       return "network";
@@ -181,6 +189,8 @@ export function iconForTab(tab: Tab): IconName {
       return "link";
     case "skills":
       return "zap";
+    case "tasks":
+      return "check";
     case "nodes":
       return "monitor";
     case "config":
@@ -202,6 +212,23 @@ export function iconForTab(tab: Tab): IconName {
     default:
       return "folder";
   }
+}
+
+// Human-readable labels for the belagent UI (bypasses i18n)
+const BELAGENT_TAB_LABELS: Partial<Record<Tab, string>> = {
+  chat: "Chat",
+  tasks: "Tasks",
+  automations: "Automations",
+  graph: "Graph",
+  skills: "Skills",
+  usage: "Usage",
+  connections: "Connections",
+  config: "Settings",
+  logs: "Logs",
+};
+
+export function labelForTab(tab: Tab): string {
+  return BELAGENT_TAB_LABELS[tab] ?? titleForTab(tab);
 }
 
 export function titleForTab(tab: Tab) {
