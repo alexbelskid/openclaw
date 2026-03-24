@@ -92,6 +92,8 @@ export type ChatProps = {
   onDraftChange: (next: string) => void;
   onRequestUpdate?: () => void;
   onSend: () => void;
+  /** Send a specific message text directly (bypasses draft). */
+  onSendMessage?: (text: string) => void;
   onAbort?: () => void;
   onQueueRemove: (id: string) => void;
   onNewSession: () => void;
@@ -531,14 +533,19 @@ function selectSlashCommand(
 
   vs.slashMenuOpen = false;
   resetSlashMenuState();
+  requestUpdate();
 
   if (cmd.executeLocal && !cmd.args) {
-    props.onDraftChange(`/${cmd.name}`);
-    requestUpdate();
-    props.onSend();
+    // Execute directly without modifying the draft (no visual flash in input)
+    if (props.onSendMessage) {
+      props.onSendMessage(`/${cmd.name}`);
+    } else {
+      props.onDraftChange(`/${cmd.name}`);
+      props.onSend();
+    }
   } else {
+    // Command needs args — fill text for the user to complete
     props.onDraftChange(`/${cmd.name} `);
-    requestUpdate();
   }
 }
 
@@ -575,10 +582,18 @@ function selectSlashArg(
   const cmdName = vs.slashMenuCommand?.name ?? "";
   vs.slashMenuOpen = false;
   resetSlashMenuState();
-  props.onDraftChange(`/${cmdName} ${arg}`);
   requestUpdate();
   if (execute) {
-    props.onSend();
+    // Execute directly without modifying the draft
+    if (props.onSendMessage) {
+      props.onSendMessage(`/${cmdName} ${arg}`);
+    } else {
+      props.onDraftChange(`/${cmdName} ${arg}`);
+      props.onSend();
+    }
+  } else {
+    // Tab-complete: fill text for user to review
+    props.onDraftChange(`/${cmdName} ${arg}`);
   }
 }
 
@@ -990,6 +1005,13 @@ export function renderChat(props: ChatProps) {
     </div>
   `;
 
+  const scrollSlashMenuActive = () => {
+    requestAnimationFrame(() => {
+      const el = document.querySelector(".slash-menu-item--active");
+      el?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    });
+  };
+
   const handleKeyDown = (e: KeyboardEvent) => {
     // Slash menu navigation — arg mode
     if (vs.slashMenuOpen && vs.slashMenuMode === "args" && vs.slashMenuArgItems.length > 0) {
@@ -999,11 +1021,13 @@ export function renderChat(props: ChatProps) {
           e.preventDefault();
           vs.slashMenuIndex = (vs.slashMenuIndex + 1) % len;
           requestUpdate();
+          scrollSlashMenuActive();
           return;
         case "ArrowUp":
           e.preventDefault();
           vs.slashMenuIndex = (vs.slashMenuIndex - 1 + len) % len;
           requestUpdate();
+          scrollSlashMenuActive();
           return;
         case "Tab":
           e.preventDefault();
@@ -1030,11 +1054,13 @@ export function renderChat(props: ChatProps) {
           e.preventDefault();
           vs.slashMenuIndex = (vs.slashMenuIndex + 1) % len;
           requestUpdate();
+          scrollSlashMenuActive();
           return;
         case "ArrowUp":
           e.preventDefault();
           vs.slashMenuIndex = (vs.slashMenuIndex - 1 + len) % len;
           requestUpdate();
+          scrollSlashMenuActive();
           return;
         case "Tab":
           e.preventDefault();
